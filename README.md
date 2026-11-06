@@ -1,0 +1,4 @@
+# Vidcode
+
+Project initialized.
+
