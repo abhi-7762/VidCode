@@ -1,4 +1,2 @@
-# Vidcode
-
-Project initialized.
-
+# VidCode
+A multiagent that programmatically creates videos or ads
