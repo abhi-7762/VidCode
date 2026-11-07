@@ -2,35 +2,40 @@
 """
 VidCode — Ultimate AI Video Generator CLI Wizard
 =================================================
-Aapko terminal me interactively poochhega ki kaisa ad ya video chahiye,
-Gemini AI se perfect script & storyboard likhwayega,
-Edge-TTS se professional voiceover banayega,
-aur FFmpeg se scene-by-scene 1080p final playable MP4 video bana kar deliver karega!
+Interactive terminal wizard:
+  - Poochega kaisa video chahiye
+  - Gemini 3.8 Flash se perfect script + storyboard
+  - Edge-TTS se real AI voiceover (Indian / English voices)
+  - Pillow se 1080p cinematic slides
+  - FFmpeg se final playable MP4 video
+
+FIX: questionary + asyncio conflict resolved — 
+     Q&A is fully synchronous, asyncio.run() only called for 
+     individual async tasks (Gemini API + Edge-TTS).
 """
 
 import sys
 import os
 import asyncio
 import json
-import time
 import textwrap
 import subprocess
 from pathlib import Path
 from datetime import datetime
 from typing import List, Optional
 
-# Ensure backend directory is in sys.path
-BASE_DIR = Path(__file__).resolve().parent
+# ── Path & venv auto-switch ────────────────────────────────────────────
+BASE_DIR    = Path(__file__).resolve().parent
 BACKEND_DIR = BASE_DIR / "backend"
+VENV_PYTHON = BACKEND_DIR / ".venv" / "Scripts" / "python.exe"
+
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-# Auto-switch to venv python if running under global python
-VENV_PYTHON = BACKEND_DIR / ".venv" / "Scripts" / "python.exe"
 if VENV_PYTHON.exists() and Path(sys.executable).resolve() != VENV_PYTHON.resolve():
     os.execv(str(VENV_PYTHON), [str(VENV_PYTHON)] + sys.argv)
 
-# Import required libraries
+# ── Library imports ────────────────────────────────────────────────────
 try:
     from rich.console import Console
     from rich.panel import Panel
@@ -45,44 +50,43 @@ try:
     import imageio_ffmpeg
     import edge_tts
 except ImportError as e:
-    print(f"Missing dependency: {e}")
+    print(f"[ERROR] Missing library: {e}")
     print("Run:  cd backend; .venv\\Scripts\\pip install rich questionary pillow edge-tts imageio-ffmpeg")
     sys.exit(1)
 
-# Import VidCode app modules (from backend)
-from app.config import get_settings
+# ── App imports ────────────────────────────────────────────────────────
 from app.services.gemini_service import GeminiService
 from app.models.script import ScriptGenerateRequest, ScriptTone, ScriptStyle
 
-# ─────────────────────────────────────────────────────────────────────
-console = Console()
+# ── Globals ────────────────────────────────────────────────────────────
+console     = Console()
 OUTPUT_BASE = BASE_DIR / "output_videos"
 OUTPUT_BASE.mkdir(exist_ok=True)
 
-custom_style = QStyle([
-    ("qmark",        "fg:#00d7ff bold"),
-    ("question",     "bold fg:#ffffff"),
-    ("answer",       "fg:#00ff87 bold"),
-    ("pointer",      "fg:#ff5fd7 bold"),
-    ("highlighted",  "fg:#ff5fd7 bold"),
-    ("selected",     "fg:#00ff87"),
-    ("separator",    "fg:#6c6c6c"),
-    ("instruction",  "fg:#858585 italic"),
-    ("text",         "fg:#ffffff"),
-    ("disabled",     "fg:#858585 italic"),
-])
-
 THEMES = [
-    {"bg_top": (10, 15, 30),  "bg_bot": (20, 30, 60),  "accent": (56, 189, 248)},   # Blue
-    {"bg_top": (25, 10, 25),  "bg_bot": (50, 15, 50),  "accent": (244, 114, 182)},  # Magenta
-    {"bg_top": (15, 23, 42),  "bg_bot": (30, 41, 59),  "accent": (52, 211, 153)},   # Emerald
-    {"bg_top": (28, 15, 10),  "bg_bot": (55, 25, 15),  "accent": (251, 146, 60)},   # Gold
-    {"bg_top": (10, 25, 15),  "bg_bot": (15, 50, 30),  "accent": (163, 230, 53)},   # Lime
+    {"bg_top": (10, 15, 30),  "bg_bot": (20, 30, 60),  "accent": (56, 189, 248)},
+    {"bg_top": (25, 10, 25),  "bg_bot": (50, 15, 50),  "accent": (244, 114, 182)},
+    {"bg_top": (15, 23, 42),  "bg_bot": (30, 41, 59),  "accent": (52, 211, 153)},
+    {"bg_top": (28, 15, 10),  "bg_bot": (55, 25, 15),  "accent": (251, 146, 60)},
+    {"bg_top": (10, 25, 15),  "bg_bot": (15, 50, 30),  "accent": (163, 230, 53)},
 ]
 
-# ─────────────────────────────────────────────────────────────────────
-# BANNER
-# ─────────────────────────────────────────────────────────────────────
+custom_style = QStyle([
+    ("qmark",       "fg:#00d7ff bold"),
+    ("question",    "bold fg:#ffffff"),
+    ("answer",      "fg:#00ff87 bold"),
+    ("pointer",     "fg:#ff5fd7 bold"),
+    ("highlighted", "fg:#ff5fd7 bold"),
+    ("selected",    "fg:#00ff87"),
+    ("instruction", "fg:#858585 italic"),
+    ("text",        "fg:#ffffff"),
+    ("disabled",    "fg:#858585 italic"),
+])
+
+
+# ══════════════════════════════════════════════════════════════════════
+# UI HELPERS
+# ══════════════════════════════════════════════════════════════════════
 
 def show_banner():
     console.print()
@@ -102,22 +106,23 @@ def step_header(num: int, title: str, emoji: str = "▶"):
     console.print(Rule(f"[bold bright_yellow]{emoji}  Step {num}: {title}[/]", style="bright_yellow"))
     console.print()
 
-# ─────────────────────────────────────────────────────────────────────
-# STEP 1 — INTERACTIVE Q&A
-# ─────────────────────────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════════════
+# STEP 1 — INTERACTIVE Q&A  (100% synchronous — no async here)
+# ══════════════════════════════════════════════════════════════════════
 
 def ask_user_requirements() -> dict:
+    """All questionary calls are synchronous — no asyncio conflict."""
     step_header(1, "Aapka Video Vision", "🎯")
     console.print("[dim]Neeche diye gaye sawalon ke jawab dein. AI aapke liye perfect video tayyar karega![/]\n")
 
-    # 1. Video Type
     video_type = questionary.select(
-        "📺 Aapko kaisa ad ya video banana hai?",
+        "📺  Aapko kaisa ad ya video banana hai?",
         choices=[
-            "📢  Commercial Ad / Product Advertisement (Instagram, FB, TV)",
-            "📱  Viral Social Media Reel / Short (9:16 Vertical / Fast Hook)",
-            "🎓  Explainer / Tutorial Video (Educational & Informative)",
-            "🏢  Corporate Brand Story (Company Presentation)",
+            "📢  Commercial Ad / Product Advertisement",
+            "📱  Viral Social Media Reel / Short",
+            "🎓  Explainer / Tutorial Video",
+            "🏢  Corporate Brand Story",
             "🛍️  E-Commerce / Product Showcase",
             "🚀  Startup Pitch / Teaser Video",
             "🎥  YouTube Long-Form Content",
@@ -127,20 +132,18 @@ def ask_user_requirements() -> dict:
     if not video_type:
         sys.exit(0)
 
-    # 2. Topic
     console.print()
     topic = questionary.text(
-        "🎯 Video ka topic, product ya brand ka naam?\n   (e.g. 'Aura Smart Watch Pro', 'AI Coding Course', 'Organic Protein Shake'):",
+        "🎯  Video ka topic, product ya brand naam?\n   (e.g. 'Aura Smart Watch Pro', 'AI Coding Course', 'Protein Shake'):",
         validate=lambda t: True if len(t.strip()) > 2 else "Kripya topic enter karein.",
         style=custom_style,
     ).ask()
     if not topic:
         sys.exit(0)
 
-    # 3. Target Audience
     console.print()
     audience = questionary.select(
-        "👥 Aapka Target Audience kaun hai?",
+        "👥  Aapka Target Audience kaun hai?",
         choices=[
             "🧑‍💻  Techies, Developers & Gadget Lovers",
             "🧑‍🎓  Students & Young Generation (18-24)",
@@ -153,12 +156,11 @@ def ask_user_requirements() -> dict:
         style=custom_style,
     ).ask()
 
-    # 4. Duration
     console.print()
     duration_choice = questionary.select(
-        "⏱️  Video kitne seconds ka hona chahiye?",
+        "⏱️   Video kitne seconds ka hona chahiye?",
         choices=[
-            "15 seconds  (Super Fast Ad / Reel / Hook)",
+            "15 seconds  (Super Fast Ad / Reel)",
             "30 seconds  (Standard Commercial Ad)",
             "45 seconds  (Detailed Product Promo)",
             "60 seconds  (Full 1-Minute Story Video)",
@@ -168,7 +170,7 @@ def ask_user_requirements() -> dict:
     ).ask()
 
     dur_map = {
-        "15 seconds  (Super Fast Ad / Reel / Hook)": 15,
+        "15 seconds  (Super Fast Ad / Reel)": 15,
         "30 seconds  (Standard Commercial Ad)": 30,
         "45 seconds  (Detailed Product Promo)": 45,
         "60 seconds  (Full 1-Minute Story Video)": 60,
@@ -176,24 +178,22 @@ def ask_user_requirements() -> dict:
     }
     duration_seconds = dur_map.get(duration_choice, 30)
 
-    # 5. Tone
     console.print()
     tone_choice = questionary.select(
         "🎭  Video ka tone / vibe kaisa hona chahiye?",
         choices=[
-            "🔥  Energetic, High-Paced & Bold (Aggressive Ad hook)",
-            "💼  Professional, Premium & Trustworthy (Apple-style luxury)",
-            "😂  Funny, Relatable & Entertaining (Viral humour)",
+            "🔥  Energetic, High-Paced & Bold",
+            "💼  Professional, Premium & Trustworthy",
+            "😂  Funny, Relatable & Entertaining",
             "🌟  Inspiring, Emotional & Motivational",
             "🔬  Informative, Clear & Educational",
         ],
         style=custom_style,
     ).ask()
 
-    # 6. Language & Voice
     console.print()
     language_choice = questionary.select(
-        "🗣️  Script aur Voiceover kis language me chahiye?",
+        "🗣️   Script aur Voiceover kis language me chahiye?",
         choices=[
             "🇮🇳  Hinglish (Hindi + English mix — Best for Indian Ads)",
             "🇮🇳  Hindi (Shuddh Hindi)",
@@ -204,61 +204,59 @@ def ask_user_requirements() -> dict:
 
     voice_map = {
         "🇮🇳  Hinglish (Hindi + English mix — Best for Indian Ads)": [
-            ("Prabhat (Indian English Male)", "en-IN-PrabhatNeural"),
+            ("Prabhat (Indian English Male)",  "en-IN-PrabhatNeural"),
             ("Neerja (Indian English Female)", "en-IN-NeerjaNeural"),
-            ("Madhur (Hindi Male)", "hi-IN-MadhurNeural"),
-            ("Swara (Hindi Female)", "hi-IN-SwaraNeural"),
+            ("Madhur (Hindi Male)",            "hi-IN-MadhurNeural"),
+            ("Swara (Hindi Female)",           "hi-IN-SwaraNeural"),
         ],
         "🇮🇳  Hindi (Shuddh Hindi)": [
-            ("Madhur (Deep Hindi Male)", "hi-IN-MadhurNeural"),
+            ("Madhur (Deep Hindi Male)",  "hi-IN-MadhurNeural"),
             ("Swara (Warm Hindi Female)", "hi-IN-SwaraNeural"),
         ],
         "🇬🇧  English (International / Global)": [
             ("Christopher (Cinematic US Male)", "en-US-ChristopherNeural"),
-            ("Jenny (Engaging US Female)", "en-US-JennyNeural"),
-            ("Ryan (Sophisticated UK Male)", "en-GB-RyanNeural"),
-            ("Sonia (Clear UK Female)", "en-GB-SoniaNeural"),
+            ("Jenny (Engaging US Female)",      "en-US-JennyNeural"),
+            ("Ryan (Sophisticated UK Male)",    "en-GB-RyanNeural"),
+            ("Sonia (Clear UK Female)",         "en-GB-SoniaNeural"),
         ],
     }
 
     console.print()
     voice_options = voice_map.get(language_choice, voice_map["🇬🇧  English (International / Global)"])
     voice_selection = questionary.select(
-        "🎙️  Narration voice kaisi chahiye?",
+        "🎙️   Narration voice kaisi chahiye?",
         choices=[v[0] for v in voice_options],
         style=custom_style,
     ).ask()
-
     voice_id = next((v[1] for v in voice_options if v[0] == voice_selection), "en-US-ChristopherNeural")
 
-    # 7. Extra Info
     console.print()
     extra = questionary.text(
-        "✨  Koi special offer, discount ya USP jo video me zaroor aaye?\n   (Optional — seedha Enter dabayein skip karne ke liye):",
+        "✨  Koi special offer ya USP jo video me zaroor aaye? (Optional — Enter dabayein skip ke liye):",
         style=custom_style,
     ).ask() or ""
 
     return {
-        "video_type":       video_type.strip().split("  ", 1)[-1],
+        "video_type":       video_type.strip(),
         "topic":            topic.strip(),
-        "audience":         audience.strip().split("  ", 1)[-1],
+        "audience":         audience.strip(),
         "duration_seconds": duration_seconds,
         "duration_label":   duration_choice,
-        "tone":             tone_choice.strip().split("  ", 1)[-1],
-        "language":         language_choice.strip().split("  ", 1)[-1],
+        "tone":             tone_choice.strip(),
+        "language":         language_choice.strip(),
         "voice_name":       voice_selection,
         "voice_id":         voice_id,
         "extra":            extra.strip(),
     }
 
-# ─────────────────────────────────────────────────────────────────────
-# STEP 2 — GEMINI AI: SCRIPT + STORYBOARD
-# ─────────────────────────────────────────────────────────────────────
 
-async def generate_ai_assets(details: dict) -> tuple[dict, dict]:
+# ══════════════════════════════════════════════════════════════════════
+# STEP 2 — ASYNC AI GENERATION (called via asyncio.run() only)
+# ══════════════════════════════════════════════════════════════════════
+
+async def _generate_ai_assets(details: dict) -> tuple[dict, dict]:
     gemini = GeminiService()
-
-    extra_line = f"\nSpecial highlight / Offer: {details['extra']}" if details["extra"] else ""
+    extra_line = f"\nSpecial highlight: {details['extra']}" if details["extra"] else ""
     prompt = (
         f"Create a {details['duration_seconds']}-second high-converting {details['video_type']} "
         f"about '{details['topic']}'.\n"
@@ -272,7 +270,6 @@ async def generate_ai_assets(details: dict) -> tuple[dict, dict]:
         "- Final scene: Clear, compelling Call-To-Action.\n"
         "- Write complete exact spoken words in 'narration' for every scene."
     )
-
     req = ScriptGenerateRequest(
         project_id="cli_wizard",
         prompt=prompt,
@@ -281,20 +278,23 @@ async def generate_ai_assets(details: dict) -> tuple[dict, dict]:
         style=ScriptStyle.STORYTELLING,
         target_audience=details["audience"],
     )
-
-    nlu = await gemini.analyse_prompt(prompt, details["duration_seconds"])
+    nlu         = await gemini.analyse_prompt(prompt, details["duration_seconds"])
     script_data = await gemini.generate_script(req, nlu)
-    storyboard_data = await gemini.generate_storyboard(script_data)
+    sb_data     = await gemini.generate_storyboard(script_data)
+    return script_data, sb_data
 
-    return script_data, storyboard_data
+def generate_ai_assets(details: dict) -> tuple[dict, dict]:
+    """Synchronous wrapper — safe to call outside any event loop."""
+    return asyncio.run(_generate_ai_assets(details))
 
-# ─────────────────────────────────────────────────────────────────────
-# STEP 3 — EDGE-TTS VOICEOVER
-# ─────────────────────────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════════════
+# STEP 3 — ASYNC VOICEOVER (called via asyncio.run() only)
+# ══════════════════════════════════════════════════════════════════════
 
 SILENT_MP3 = b"\xff\xfb\x90\x64" + b"\x00" * 512
 
-async def generate_voiceover(text: str, voice_id: str, out: Path) -> Path:
+async def _generate_voiceover(text: str, voice_id: str, out: Path) -> Path:
     if not text.strip():
         out.write_bytes(SILENT_MP3)
         return out
@@ -307,8 +307,11 @@ async def generate_voiceover(text: str, voice_id: str, out: Path) -> Path:
         out.write_bytes(SILENT_MP3)
     return out
 
+def generate_voiceover(text: str, voice_id: str, out: Path) -> Path:
+    """Synchronous wrapper."""
+    return asyncio.run(_generate_voiceover(text, voice_id, out))
+
 def probe_duration(path: Path) -> float:
-    """Get audio duration with ffprobe-style parsing."""
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
     try:
         res = subprocess.run(
@@ -319,81 +322,67 @@ def probe_duration(path: Path) -> float:
             if "Duration:" in line:
                 dur_str = line.split("Duration:")[1].split(",")[0].strip()
                 h, m, s = dur_str.split(":")
-                return max(2.0, float(h) * 3600 + float(m) * 60 + float(s) + 0.5)
+                return max(2.5, float(h) * 3600 + float(m) * 60 + float(s) + 0.5)
     except Exception:
         pass
     return 4.0
 
-# ─────────────────────────────────────────────────────────────────────
-# STEP 4 — RENDER 1080P SCENE SLIDE (PILLOW)
-# ─────────────────────────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════════════
+# STEP 4 — 1080P SLIDE RENDERING (synchronous)
+# ══════════════════════════════════════════════════════════════════════
 
 def render_slide(
     scene_num: int, total: int,
     title: str, action: str, narration: str,
-    duration: float, out_png: Path,
-    theme_idx: int = 0,
+    duration: float, out_png: Path, theme_idx: int = 0,
 ):
     W, H = 1920, 1080
     t = THEMES[theme_idx % len(THEMES)]
-    img = Image.new("RGB", (W, H))
+    img  = Image.new("RGB", (W, H))
     draw = ImageDraw.Draw(img)
 
-    # Gradient background
     r1, g1, b1 = t["bg_top"]
     r2, g2, b2 = t["bg_bot"]
     for y in range(H):
         f = y / H
         draw.line([(0, y), (W, y)], fill=(
-            int(r1 + (r2 - r1) * f),
-            int(g1 + (g2 - g1) * f),
-            int(b1 + (b2 - b1) * f),
+            int(r1 + (r2 - r1) * f), int(g1 + (g2 - g1) * f), int(b1 + (b2 - b1) * f),
         ))
 
     ac = t["accent"]
-
-    # Top bar
     draw.rectangle([(0, 0), (W, 90)], fill=(5, 8, 18))
     draw.line([(0, 90), (W, 90)], fill=ac, width=3)
-    draw.text((70, 25), "🎬  VIDCODE AI STUDIO", fill=ac)
-    draw.text((W - 350, 25), f"SCENE {scene_num} / {total}  •  {duration:.1f}s", fill=(160, 170, 190))
+    draw.text((70, 25),     "🎬  VIDCODE AI STUDIO",                fill=ac)
+    draw.text((W - 360, 25), f"SCENE {scene_num} / {total}  •  {duration:.1f}s", fill=(160, 170, 190))
 
-    # Main visual box
     bx1, by1, bx2, by2 = 100, 160, W - 100, 720
     draw.rectangle([(bx1, by1), (bx2, by2)], fill=(10, 15, 28), outline=ac, width=2)
 
-    # Decorative accent corner lines
-    for offset in [0, 6, 12]:
-        draw.line([(bx1, by1 + offset), (bx1 + 60, by1 + offset)], fill=ac, width=1)
-        draw.line([(bx1 + offset, by1), (bx1 + offset, by1 + 60)], fill=ac, width=1)
-        draw.line([(bx2, by2 - offset), (bx2 - 60, by2 - offset)], fill=ac, width=1)
-        draw.line([(bx2 - offset, by2), (bx2 - offset, by2 - 60)], fill=ac, width=1)
+    for off in [0, 6, 12]:
+        draw.line([(bx1, by1 + off), (bx1 + 60, by1 + off)], fill=ac, width=1)
+        draw.line([(bx1 + off, by1), (bx1 + off, by1 + 60)], fill=ac, width=1)
+        draw.line([(bx2, by2 - off), (bx2 - 60, by2 - off)], fill=ac, width=1)
+        draw.line([(bx2 - off, by2), (bx2 - off, by2 - 60)], fill=ac, width=1)
 
-    # Scene number big
-    draw.text((bx1 + 50, by1 + 40), f"SCENE {scene_num}", fill=ac)
-    draw.text((bx1 + 50, by1 + 90), title.upper(), fill=(241, 245, 249))
-
-    # Divider
+    draw.text((bx1 + 50, by1 + 40), f"SCENE {scene_num}",  fill=ac)
+    draw.text((bx1 + 50, by1 + 90), title.upper(),          fill=(241, 245, 249))
     draw.line([(bx1 + 50, by1 + 150), (bx2 - 50, by1 + 150)], fill=(30, 41, 59), width=1)
-
-    # Action text
     draw.text((bx1 + 50, by1 + 175), "📷  VISUAL / CAMERA:", fill=(148, 163, 184))
-    wrapped_action = textwrap.fill(action, width=85)
-    draw.text((bx1 + 50, by1 + 220), wrapped_action, fill=(209, 213, 219))
+    draw.text((bx1 + 50, by1 + 220), textwrap.fill(action, 85),   fill=(209, 213, 219))
 
-    # Bottom subtitle bar
     sb1, sb2 = 750, 1010
     draw.rectangle([(100, sb1), (W - 100, sb2)], fill=(6, 10, 20), outline=(30, 41, 59), width=1)
     draw.line([(100, sb1), (W - 100, sb1)], fill=ac, width=2)
     draw.text((140, sb1 + 20), "🎙️  NARRATION / VOICEOVER:", fill=(250, 204, 21))
-    wrapped_narr = textwrap.fill(f'"{narration}"', width=95)
-    draw.text((140, sb1 + 65), wrapped_narr, fill=(255, 255, 255))
+    draw.text((140, sb1 + 65), textwrap.fill(f'"{narration}"', 95), fill=(255, 255, 255))
 
     img.save(str(out_png), "PNG")
 
-# ─────────────────────────────────────────────────────────────────────
-# STEP 5 — FFMPEG SCENE CLIP + MASTER ASSEMBLE
-# ─────────────────────────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════════════
+# STEP 5 — FFMPEG CLIP + MASTER ASSEMBLY (synchronous)
+# ══════════════════════════════════════════════════════════════════════
 
 def render_clip(slide: Path, audio: Path, duration: float, out: Path) -> bool:
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
@@ -411,12 +400,11 @@ def render_clip(slide: Path, audio: Path, duration: float, out: Path) -> bool:
     return out.exists() and out.stat().st_size > 0
 
 def assemble_video(clips: List[Path], out_mp4: Path) -> bool:
-    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-    concat = out_mp4.parent / "concat.txt"
+    ffmpeg  = imageio_ffmpeg.get_ffmpeg_exe()
+    concat  = out_mp4.parent / "concat.txt"
     with open(concat, "w", encoding="utf-8") as f:
         for c in clips:
             f.write(f"file '{c.resolve().as_posix()}'\n")
-
     cmd = [
         ffmpeg, "-y",
         "-f", "concat", "-safe", "0",
@@ -428,17 +416,17 @@ def assemble_video(clips: List[Path], out_mp4: Path) -> bool:
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return out_mp4.exists() and out_mp4.stat().st_size > 0
 
-# ─────────────────────────────────────────────────────────────────────
-# MAIN PIPELINE
-# ─────────────────────────────────────────────────────────────────────
 
-async def run_pipeline():
+# ══════════════════════════════════════════════════════════════════════
+# MAIN PIPELINE — 100% SYNCHRONOUS (no async/await here)
+# ══════════════════════════════════════════════════════════════════════
+
+def run_pipeline():
     show_banner()
 
-    # 1. Gather requirements from user
+    # ── Step 1: Interactive Q&A ────────────────────────────────────────
     details = ask_user_requirements()
 
-    # Confirm
     console.print()
     console.print(Panel(
         f"[bold white]📌 Topic:[/]       [cyan]{details['topic']}[/]\n"
@@ -454,9 +442,8 @@ async def run_pipeline():
     console.print()
 
     go = questionary.confirm(
-        "🚀 Sab kuch theek lag raha hai? Video generation shuru karein?",
-        default=True,
-        style=custom_style,
+        "🚀  Sab kuch theek lag raha hai? Video generation shuru karein?",
+        default=True, style=custom_style,
     ).ask()
 
     if not go:
@@ -464,14 +451,14 @@ async def run_pipeline():
         return
 
     # Setup project folder
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    slug = "".join(c if c.isalnum() else "_" for c in details["topic"][:25]).strip("_")
-    project_dir = OUTPUT_BASE / f"{slug}_{ts}"
-    scenes_dir  = project_dir / "scenes"
+    ts    = datetime.now().strftime("%Y%m%d_%H%M%S")
+    slug  = "".join(c if c.isalnum() else "_" for c in details["topic"][:25]).strip("_")
+    proj  = OUTPUT_BASE / f"{slug}_{ts}"
+    scenes_dir = proj / "scenes"
     scenes_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2. AI: Script + Storyboard
-    step_header(2, "AI Script & Storyboard Generation — Gemini 3.8 Flash", "🧠")
+    # ── Step 2: AI Script + Storyboard ────────────────────────────────
+    step_header(2, "AI Script & Storyboard — Gemini 3.8 Flash", "🧠")
 
     with Progress(
         SpinnerColumn(spinner_name="dots12", style="bright_cyan"),
@@ -480,10 +467,10 @@ async def run_pipeline():
         console=console,
     ) as prog:
         t = prog.add_task("Gemini AI se script aur storyboard banwaya ja raha hai...", total=None)
-        script_data, storyboard_data = await generate_ai_assets(details)
+        # asyncio.run() safe here — no event loop is running yet
+        script_data, storyboard_data = generate_ai_assets(details)
         prog.update(t, description="[bold green]✓  Script & Storyboard ready!")
 
-    # Print summary
     console.print()
     console.print(Panel(
         f"[bold bright_green]🎬 Title:[/]   {script_data.get('title', details['topic'])}\n"
@@ -496,22 +483,20 @@ async def run_pipeline():
 
     scenes = script_data.get("scenes", [])
     if not scenes:
-        # Fallback if Gemini returns no scenes
-        n_scenes = max(2, details["duration_seconds"] // 15)
+        n = max(2, details["duration_seconds"] // 15)
         scenes = [
             {
                 "scene_number": i + 1,
-                "title": ["Hook", "Problem", "Solution", "Benefits", "CTA"][i % 5],
-                "duration_seconds": details["duration_seconds"] // n_scenes,
+                "title":    ["Hook", "Problem", "Solution", "Benefits", "CTA"][i % 5],
+                "duration_seconds": details["duration_seconds"] // n,
                 "narration": f"Scene {i+1}: {details['topic']}.",
-                "action": f"Dynamic cinematic shot of {details['topic']}.",
+                "action":   f"Dynamic cinematic shot of {details['topic']}.",
             }
-            for i in range(n_scenes)
+            for i in range(n)
         ]
 
-    # 3. Voiceover + Slide rendering per scene
-    step_header(3, "Scene Rendering — Voiceover + 1080p Slides + Clips", "🎬")
-
+    # ── Step 3: Voiceover + Slides + Scene Clips ───────────────────────
+    step_header(3, "Voiceover + 1080p Slides + Scene Clips", "🎬")
     scene_clips: List[Path] = []
 
     with Progress(
@@ -524,32 +509,21 @@ async def run_pipeline():
         render_task = prog.add_task("Scenes rendering...", total=len(scenes))
 
         for idx, scene in enumerate(scenes):
-            snum  = scene.get("scene_number", idx + 1)
-            title = scene.get("title", f"Scene {snum}")
-            narr  = (scene.get("narration") or scene.get("dialogue") or f"{details['topic']} scene {snum}.").strip()
+            snum   = scene.get("scene_number", idx + 1)
+            title  = scene.get("title", f"Scene {snum}")
+            narr   = (scene.get("narration") or scene.get("dialogue") or f"{details['topic']} scene {snum}.").strip()
             action = (scene.get("action") or "Cinematic product shot").strip()
 
-            prog.update(render_task, description=f"Scene {snum}/{len(scenes)}: Audio...")
-
-            # Audio
+            prog.update(render_task, description=f"Scene {snum}/{len(scenes)}: Voiceover...")
             audio_path = scenes_dir / f"audio_{snum}.mp3"
-            await generate_voiceover(narr, details["voice_id"], audio_path)
+            generate_voiceover(narr, details["voice_id"], audio_path)   # sync wrapper
             duration = probe_duration(audio_path)
 
             prog.update(render_task, description=f"Scene {snum}/{len(scenes)}: Slide frame...")
-
-            # 1080p slide
             slide_path = scenes_dir / f"frame_{snum}.png"
-            render_slide(
-                scene_num=snum, total=len(scenes),
-                title=title, action=action, narration=narr,
-                duration=duration, out_png=slide_path,
-                theme_idx=idx,
-            )
+            render_slide(snum, len(scenes), title, action, narr, duration, slide_path, idx)
 
             prog.update(render_task, description=f"Scene {snum}/{len(scenes)}: FFmpeg clip...")
-
-            # Scene MP4 clip
             clip_path = scenes_dir / f"clip_{snum}.mp4"
             render_clip(slide_path, audio_path, duration, clip_path)
             if clip_path.exists():
@@ -557,9 +531,9 @@ async def run_pipeline():
 
             prog.advance(render_task)
 
-    # 4. Final Assembly
+    # ── Step 4: Final Assembly ─────────────────────────────────────────
     step_header(4, "Final Master Video Assembly — FFmpeg", "🎞️")
-    final_mp4 = project_dir / f"{slug}_final.mp4"
+    final_mp4 = proj / f"{slug}_final.mp4"
 
     with Progress(
         SpinnerColumn(style="bright_magenta"),
@@ -571,19 +545,15 @@ async def run_pipeline():
         ok = assemble_video(scene_clips, final_mp4)
         prog.update(t, description="[bold green]✓  Master render complete!")
 
-    if not ok or not final_mp4.exists():
-        console.print("[red]Video assembly failed. Scenes folder mein individual clips check karein.[/]")
+    if not ok:
+        console.print("[red]Assembly failed. Scenes folder mein individual clips check karein.[/]")
         final_mp4 = scene_clips[0] if scene_clips else None
 
-    # 5. Save production files
-    (project_dir / "script.json").write_text(
-        json.dumps(script_data, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    (project_dir / "storyboard.json").write_text(
-        json.dumps(storyboard_data, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    # ── Save production files ──────────────────────────────────────────
+    (proj / "script.json").write_text(json.dumps(script_data, indent=2, ensure_ascii=False), encoding="utf-8")
+    (proj / "storyboard.json").write_text(json.dumps(storyboard_data, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    script_txt_lines = [
+    lines = [
         f"VIDEO TITLE: {script_data.get('title', details['topic'])}",
         f"DURATION: {details['duration_label']}",
         f"HOOK: {script_data.get('hook', '')}",
@@ -591,33 +561,32 @@ async def run_pipeline():
         "",
     ]
     for s in scenes:
-        script_txt_lines += [
-            f"─── SCENE {s.get('scene_number')}: {s.get('title')} ({s.get('duration_seconds', '?')}s) ───",
-            f"[VISUAL] {s.get('action', '')}",
+        lines += [
+            f"─── SCENE {s.get('scene_number')}: {s.get('title')} ({s.get('duration_seconds','?')}s) ───",
+            f"[VISUAL]    {s.get('action', '')}",
             f"[NARRATION] {s.get('narration', '')}",
             "",
         ]
-    script_txt_lines.append(f"CALL TO ACTION: {script_data.get('call_to_action', '')}")
-    (project_dir / "script.txt").write_text("\n".join(script_txt_lines), encoding="utf-8")
+    lines.append(f"CALL TO ACTION: {script_data.get('call_to_action', '')}")
+    (proj / "script.txt").write_text("\n".join(lines), encoding="utf-8")
 
-    # Build production brief with AI image prompts from storyboard
-    storyboard_scenes = storyboard_data.get("scenes", [])
-    brief_lines = [
-        f"# 🎬 Video Production Brief\n",
+    sb_scenes = storyboard_data.get("scenes", [])
+    brief = [
+        "# 🎬 Video Production Brief\n",
         f"**Topic:** {details['topic']}",
         f"**Type:** {details['video_type']}",
         f"**Duration:** {details['duration_label']}",
         f"**Language:** {details['language']}",
         f"**Voice:** {details['voice_name']}\n",
         "---\n",
-        "## Storyboard Scene Prompts (Midjourney / DALL-E / Runway)\n",
+        "## AI Image Prompts (Midjourney / DALL-E / Runway)\n",
     ]
-    for i, s in enumerate(storyboard_scenes, 1):
+    for i, s in enumerate(sb_scenes, 1):
         vp = s.get("visual_prompt") or s.get("action_description") or ""
-        brief_lines.append(f"**Scene {i}:** `{vp}, cinematic, 4K, professional photography`")
-    (project_dir / "production_brief.md").write_text("\n".join(brief_lines), encoding="utf-8")
+        brief.append(f"**Scene {i}:** `{vp}, cinematic, 4K, professional photography`")
+    (proj / "production_brief.md").write_text("\n".join(brief), encoding="utf-8")
 
-    # 6. DELIVERY 🎉
+    # ── Delivery 🎉 ────────────────────────────────────────────────────
     console.print()
     console.print(Panel(
         Align.center(Text.from_markup(
@@ -628,56 +597,40 @@ async def run_pipeline():
         padding=(1, 4),
     ))
 
-    table = Table(title="📁  Delivered Files", border_style="bright_cyan", show_header=True)
+    table = Table(title="📁  Delivered Files", border_style="bright_cyan")
     table.add_column("File", style="bold cyan", min_width=28)
     table.add_column("Description", style="white")
-    table.add_row("🎬 " + (final_mp4.name if final_mp4 else "see scenes/"), "Playable 1080p Master MP4 Video")
+    table.add_row("🎬 " + (final_mp4.name if final_mp4 else "see scenes/"), "Playable 1080p Master MP4")
     table.add_row("📝 script.txt",           "Full readable script with narration")
-    table.add_row("🎨 storyboard.json",      "Scene-by-scene cinematography plan")
+    table.add_row("🎨 storyboard.json",      "Scene cinematography plan")
     table.add_row("🧪 production_brief.md",  "AI image prompts for Midjourney/DALL-E")
-    table.add_row("📂 scenes/",              "Individual scene clips + audio files")
+    table.add_row("📂 scenes/",              "Individual clips + audio files")
     console.print(table)
-
     console.print()
     console.print(Panel(
-        f"[bold bright_yellow]📂 Output Folder:[/]\n"
-        f"[white]{project_dir}[/]",
-        border_style="bright_yellow",
-        padding=(0, 2),
+        f"[bold bright_yellow]📂 Output Folder:[/]\n[white]{proj}[/]",
+        border_style="bright_yellow", padding=(0, 2),
     ))
 
-    # Play & Open options
+    # Play & Open
     console.print()
     if final_mp4 and final_mp4.exists():
-        play = questionary.confirm(
-            "▶️  Kya video abhi play karke dekhna chahte hain?",
-            default=True, style=custom_style,
-        ).ask()
-        if play:
+        if questionary.confirm("▶️   Kya video abhi play karke dekhna chahte hain?", default=True, style=custom_style).ask():
             try:
                 os.startfile(str(final_mp4))
             except Exception:
                 subprocess.Popen(["cmd", "/c", "start", "", str(final_mp4)])
             console.print("[green]✓ Video player me open ho gaya![/]")
 
-    open_folder = questionary.confirm(
-        "📂  Windows Explorer me output folder kholein?",
-        default=True, style=custom_style,
-    ).ask()
-    if open_folder:
+    if questionary.confirm("📂  Windows Explorer me output folder kholein?", default=True, style=custom_style).ask():
         try:
-            subprocess.Popen(["explorer", str(project_dir)])
+            subprocess.Popen(["explorer", str(proj)])
         except Exception:
             pass
 
-    # Another video?
     console.print()
-    again = questionary.confirm(
-        "🔄  Ek aur video banana hai?",
-        default=False, style=custom_style,
-    ).ask()
-    if again:
-        await run_pipeline()
+    if questionary.confirm("🔄  Ek aur video banana hai?", default=False, style=custom_style).ask():
+        run_pipeline()
     else:
         console.print()
         console.print(Panel(
@@ -690,8 +643,12 @@ async def run_pipeline():
         ))
 
 
+# ══════════════════════════════════════════════════════════════════════
+# ENTRY POINT
+# ══════════════════════════════════════════════════════════════════════
+
 if __name__ == "__main__":
     try:
-        asyncio.run(run_pipeline())
+        run_pipeline()   # synchronous — no asyncio.run() at top level
     except KeyboardInterrupt:
         console.print("\n[yellow]Stopped. Phir milenge! 👋[/]")
