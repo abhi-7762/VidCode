@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.database import connect_db, close_db
-from app.routers import projects, files, jobs
+from app.routers import projects, files, jobs, scripts
 
 settings = get_settings()
 
@@ -37,6 +37,7 @@ app.add_middleware(
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
 app.include_router(jobs.router, prefix="/api/v1")
+app.include_router(scripts.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])
