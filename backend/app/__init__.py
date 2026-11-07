@@ -1,0 +1,2 @@
+"""VidCode backend application package."""
+
