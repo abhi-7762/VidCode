@@ -44,3 +44,4 @@ class BaseVideoProvider(ABC):
     async def fetch_video_bytes(self, video_url: str) -> bytes:
         """Downloads the rendered video bytes."""
         pass
+

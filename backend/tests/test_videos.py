@@ -94,3 +94,4 @@ async def test_regenerate_clip(client):
         assert resp.json()["retry_count"] == 1
     finally:
         app.dependency_overrides.clear()
+

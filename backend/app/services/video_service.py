@@ -238,3 +238,4 @@ class VideoService:
 
         updated = await self.get_clip_by_id(clip_id)
         return updated
+

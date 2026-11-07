@@ -16,3 +16,4 @@ def get_video_provider(provider_type: Optional[VideoProviderType] = None) -> Bas
     elif p_type == VideoProviderType.MOCK or p_type == VideoProviderType.PIKA:
         return MockVideoProvider()
     return MockVideoProvider()
+

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.database import connect_db, close_db
-from app.routers import projects, files, jobs, scripts, storyboard, videos
+from app.routers import projects, files, jobs, scripts, storyboard, videos, production
 
 settings = get_settings()
 
@@ -44,6 +44,7 @@ app.include_router(jobs.router, prefix="/api/v1")
 app.include_router(scripts.router, prefix="/api/v1")
 app.include_router(storyboard.router, prefix="/api/v1")
 app.include_router(videos.router, prefix="/api/v1")
+app.include_router(production.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])

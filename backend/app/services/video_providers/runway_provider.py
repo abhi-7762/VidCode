@@ -95,3 +95,4 @@ class RunwayVideoProvider(BaseVideoProvider):
             resp = await client.get(video_url)
             resp.raise_for_status()
             return resp.content
+

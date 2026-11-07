@@ -102,3 +102,4 @@ async def regenerate_clip(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Regeneration failed: {str(e)}")
+

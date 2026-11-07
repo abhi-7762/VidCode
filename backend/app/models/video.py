@@ -82,3 +82,4 @@ class BatchClipsResponse(BaseModel):
     storyboard_id: str
     total_clips: int
     clips: List[Dict[str, Any]]
+

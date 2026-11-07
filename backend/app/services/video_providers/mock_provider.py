@@ -62,3 +62,4 @@ class MockVideoProvider(BaseVideoProvider):
 
     async def fetch_video_bytes(self, video_url: str) -> bytes:
         return MINIMAL_VALID_MP4
+

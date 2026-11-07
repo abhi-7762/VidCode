@@ -58,5 +58,5 @@ pytest
 | 2 — Gemini Intelligence | ✅ Done | Script generation, NLU, story planning |
 | 3 — Storyboard Generation | ✅ Done | Scene planning, camera specs, character consistency, prompts |
 | 4 — AI Video Generation | ✅ Done | RunwayML, Luma, Mock provider clip generation, job tracking |
-| 5 — Video Production | 🔜 Next | Voice, audio, subtitles, FFmpeg rendering |
-| 6 — Quality & Optimization | ⏳ | Validation, regeneration, cost tracking |
+| 5 — Video Production | ✅ Done | Voiceover (Edge-TTS / ElevenLabs), subtitles, FFmpeg rendering |
+| 6 — Quality & Optimization | 🔜 Next | Validation, regeneration, cost tracking, version management |
