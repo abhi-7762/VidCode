@@ -293,3 +293,4 @@ class ProductionService:
     async def get_jobs_by_project(self, project_id: str) -> List[dict]:
         cursor = self._collection().find({"project_id": project_id}).sort("created_at", -1)
         return [self._serialize(doc) async for doc in cursor]
+

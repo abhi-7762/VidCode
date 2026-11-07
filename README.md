@@ -38,25 +38,32 @@ pip install -r requirements.txt
 copy .env.example .env      # then fill in your values
 ```
 
-## Running
+## Running the Application
 
 ```bash
-# API server
+cd backend
+.venv\Scripts\activate      # Windows (.venv/bin/activate on Mac/Linux)
+
+# Start API Server with live reload
+python run.py
+
+# Or directly with Uvicorn
 uvicorn app.main:app --reload
+```
+Once started, open your browser to **`http://127.0.0.1:8000/docs`** for the interactive Swagger dashboard.
 
-# Celery worker (requires Redis)
-celery -A app.celery_app worker --loglevel=info
+## Running Tests
 
-# Tests
+```bash
 pytest
 ```
 
-## Build Phases
+## Build Phases Status
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 1 — Backend Foundation | ✅ Done | FastAPI, MongoDB, Redis, Celery, File storage |
-| 2 — Gemini Intelligence | ✅ Done | Script generation, NLU, story planning |
-| 3 — Storyboard Generation | ✅ Done | Scene planning, camera specs, character consistency, prompts |
-| 4 — AI Video Generation | ✅ Done | RunwayML, Luma, Mock provider clip generation, job tracking |
-| 5 — Video Production | ✅ Done | Voiceover (Edge-TTS / ElevenLabs), subtitles, FFmpeg rendering |
-| 6 — Quality & Optimization | 🔜 Next | Validation, regeneration, cost tracking, version management |
+| 1 — Backend Foundation | ✅ Complete | FastAPI, MongoDB, Redis, Celery, File storage |
+| 2 — Gemini Intelligence | ✅ Complete | Script generation, NLU, story planning |
+| 3 — Storyboard Generation | ✅ Complete | Scene planning, camera specs, character consistency, prompts |
+| 4 — AI Video Generation | ✅ Complete | RunwayML, Luma, Mock provider clip generation, job tracking |
+| 5 — Video Production | ✅ Complete | Voiceover (Edge-TTS / ElevenLabs), subtitles, FFmpeg rendering |
+| 6 — Quality & Optimization | ✅ Complete | Validation, visual audit, scene splicing, cost & version control |

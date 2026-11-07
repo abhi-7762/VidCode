@@ -95,3 +95,4 @@ async def get_project_renders(
         "total_renders": len(jobs),
         "renders": jobs,
     }
+

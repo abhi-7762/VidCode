@@ -91,3 +91,4 @@ class VoiceInfo(BaseModel):
     language: str
     gender: str
     provider: VoiceProviderType
+

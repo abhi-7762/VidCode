@@ -72,3 +72,4 @@ class SubtitleService:
         content = "\n".join(vtt_entries)
         output_path.write_text(content, encoding="utf-8")
         return output_path
+

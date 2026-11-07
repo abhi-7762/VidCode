@@ -101,3 +101,4 @@ async def test_get_project_renders(client):
         assert data["renders"][0]["_id"] == MOCK_RENDER_JOB["_id"]
     finally:
         app.dependency_overrides.clear()
+
