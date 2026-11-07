@@ -40,17 +40,35 @@ copy .env.example .env      # then fill in your values
 
 ## Running the Application
 
-```bash
-cd backend
-.venv\Scripts\activate      # Windows (.venv/bin/activate on Mac/Linux)
+### 1. Interactive 9:16 Video Generator (Recommended)
+Generate high-converting 1080x1920 Instagram Reels & YouTube Shorts commercials with real matched HD footage, Edge-TTS studio voiceover, kinetic subtitles, and brand banners:
 
-# Start API Server with live reload
+```bash
+# Easy launcher (menu selection):
 python run.py
 
-# Or directly with Uvicorn
+# Or directly:
+python run.py --cli
+# or:
+backend\.venv\Scripts\python.exe vidcode_cli.py
+```
+
+### 2. FastAPI Backend & Swagger API Docs
+```bash
+# Start API Server:
+python run.py --server
+
+# Or directly with Uvicorn:
 uvicorn app.main:app --reload
 ```
 Once started, open your browser to **`http://127.0.0.1:8000/docs`** for the interactive Swagger dashboard.
+
+### 3. Matched Food Commercial Demo (Ambika Rasoi)
+```bash
+python run.py --demo
+# or:
+backend\.venv\Scripts\python.exe make_matched_commercial.py
+```
 
 ## Running Tests
 
