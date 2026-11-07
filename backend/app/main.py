@@ -1,10 +1,11 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.database import connect_db, close_db
-from app.routers import projects, files, jobs, scripts
+from app.routers import projects, files, jobs, scripts, storyboard
 
 settings = get_settings()
 
@@ -12,9 +13,12 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    await connect_db()
+    is_test = os.getenv("TESTING", "").lower() == "true" or settings.testing
+    if not is_test:
+        await connect_db()
     yield
-    await close_db()
+    if not is_test:
+        await close_db()
 
 
 app = FastAPI(
@@ -38,6 +42,7 @@ app.include_router(projects.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
 app.include_router(jobs.router, prefix="/api/v1")
 app.include_router(scripts.router, prefix="/api/v1")
+app.include_router(storyboard.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])

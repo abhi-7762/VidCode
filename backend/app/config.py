@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_name: str = "VidCode"
     app_env: str = "development"
     debug: bool = True
+    testing: bool = False
     secret_key: str = "change-me-in-production"
 
     # MongoDB
@@ -30,9 +31,11 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     runway_api_key: str = ""
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 @lru_cache()

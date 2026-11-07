@@ -183,3 +183,105 @@ Return ONLY valid JSON: {"structures": [{"name": "...", "description": "...", "a
         ])
         data = _extract_json(response.text)
         return data.get("structures", [])
+
+    # ------------------------------------------------------------------
+    # 5. Storyboard & Shot Planning (Phase 3)
+    # ------------------------------------------------------------------
+    async def generate_storyboard(
+        self,
+        script_data: dict,
+        visual_theme: str = "cinematic, photorealistic, 8k resolution",
+        aspect_ratio: str = "16:9",
+    ) -> dict:
+        """
+        Convert a Script into a filmable Storyboard with camera specs,
+        character consistency, and diffusion-ready prompts.
+        """
+        system = f"""You are an elite Hollywood Director of Photography and AI Cinematographer.
+Transform the provided video script into an exquisitely planned Storyboard.
+
+CRITICAL OBJECTIVES:
+1. CHARACTER CONSISTENCY: Detect every recurring person/character and build an exact visual profile (hair, face, attire, colors) with consistency anchor tags.
+2. SHOT SPECIFICATIONS: Segment script scenes into realistic video generation clips (each 4 to 8 seconds).
+3. CAMERA SPECS: Choose precise camera shot types (wide, medium, close_up, extreme_close_up, point_of_view, over_the_shoulder), angles (eye_level, low_angle, high_angle, dutch_angle, birds_eye), movement (static, pan_left, pan_right, tilt_up, tilt_down, dolly_in, dolly_out, tracking, orbit, handheld_organic), lens, depth of field, and lighting.
+4. PROMPT GENERATION: Write rich, detailed prompts for video generation models (Runway Gen-3, Luma Dream Machine, Sora) that incorporate the character consistency tags, environmental lighting, motion dynamics, and style preset.
+
+Return ONLY valid JSON matching this exact structure:
+{{
+  "visual_theme": "{visual_theme}",
+  "aspect_ratio": "{aspect_ratio}",
+  "characters": [
+    {{
+      "name": "character name",
+      "appearance": "precise facial features, hair style and color, ethnicity, age, build",
+      "outfit": "exact garments, fabrics, textures, color scheme",
+      "consistency_tags": ["tag1", "tag2"]
+    }}
+  ],
+  "scenes": [
+    {{
+      "scene_number": 1,
+      "title": "scene title",
+      "duration_seconds": 5,
+      "script_scene_number": 1,
+      "action_description": "what happens in this exact clip",
+      "narration_cue": "relevant line or narration voiceover snippet",
+      "camera": {{
+        "shot_type": "medium",
+        "camera_angle": "eye_level",
+        "movement": "dolly_in",
+        "lens": "35mm anamorphic lens",
+        "depth_of_field": "shallow depth of field with subtle bokeh",
+        "lighting": "warm volumetric sunlight streaming from side"
+      }},
+      "characters_present": ["character name"],
+      "environment": "setting description, time of day, atmosphere",
+      "visual_prompt": "highly descriptive prompt combining character anchors, action, camera motion, and cinematic style",
+      "negative_prompt": "blurry, distorted, low quality, artifacts, text, watermark, deformed limbs",
+      "motion_strength": 5,
+      "transition_to_next": "cut"
+    }}
+  ]
+}}
+No markdown formatting other than JSON. No explanations."""
+
+        prompt_content = f"""SCRIPT TITLE: {script_data.get('title', 'Untitled')}
+LOGLINE: {script_data.get('logline', '')}
+TARGET DURATION: {script_data.get('total_duration_seconds', 60)}s
+SCENES IN SCRIPT:
+{json.dumps(script_data.get('scenes', []), indent=2)}"""
+
+        response = self.model.generate_content([system, prompt_content])
+        return _extract_json(response.text)
+
+    # ------------------------------------------------------------------
+    # 6. Scene Prompt Regeneration
+    # ------------------------------------------------------------------
+    async def regenerate_scene_prompt(
+        self,
+        scene_data: dict,
+        characters: list,
+        visual_theme: str,
+        additional_guidance: Optional[str] = None,
+    ) -> dict:
+        """Regenerate a single scene's visual prompt with updated direction."""
+        system = """You are an AI video prompt engineer.
+Update the scene's visual prompt, camera specs, and action description based on the director's guidance.
+Maintain strict consistency with the character profiles and visual theme.
+Return ONLY valid JSON with keys: "action_description", "visual_prompt", "negative_prompt", "motion_strength", "camera"."""
+
+        prompt_content = f"""SCENE DATA:
+{json.dumps(scene_data, indent=2)}
+
+CHARACTER PROFILES:
+{json.dumps(characters, indent=2)}
+
+VISUAL THEME:
+{visual_theme}
+
+DIRECTOR'S GUIDANCE:
+{additional_guidance or "Enhance cinematic quality, clarity, and motion dynamics."}"""
+
+        response = self.model.generate_content([system, prompt_content])
+        return _extract_json(response.text)
+

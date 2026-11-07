@@ -55,8 +55,8 @@ pytest
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 1 — Backend Foundation | ✅ Done | FastAPI, MongoDB, Redis, Celery, File storage |
-| 2 — Gemini Intelligence | 🔜 Next | Script generation, NLU, story planning |
-| 3 — Storyboard Generation | ⏳ | Scene planning, camera specs, prompt generation |
-| 4 — AI Video Generation | ⏳ | RunwayML/Pika clip generation, job tracking |
+| 2 — Gemini Intelligence | ✅ Done | Script generation, NLU, story planning |
+| 3 — Storyboard Generation | ✅ Done | Scene planning, camera specs, character consistency, prompts |
+| 4 — AI Video Generation | 🔜 Next | RunwayML/Pika/Luma clip generation, job tracking |
 | 5 — Video Production | ⏳ | Voice, audio, subtitles, FFmpeg rendering |
 | 6 — Quality & Optimization | ⏳ | Validation, regeneration, cost tracking |

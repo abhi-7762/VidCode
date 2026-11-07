@@ -112,3 +112,4 @@ async def suggest_story_structures(body: StoryStructureRequest):
         return {"structures": structures}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Story structure generation failed: {str(e)}")
+

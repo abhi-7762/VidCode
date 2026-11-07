@@ -1,9 +1,9 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock
 from bson import ObjectId
 from datetime import datetime
-
+from app.main import app
+from app.routers.projects import get_project_service
 
 MOCK_PROJECT = {
     "_id": str(ObjectId()),
@@ -30,51 +30,33 @@ MOCK_PROJECT = {
 }
 
 
-def make_client(mock_service):
-    with patch("app.database.connect_db", new_callable=AsyncMock), \
-         patch("app.database.close_db", new_callable=AsyncMock), \
-         patch("app.routers.projects.ProjectService", return_value=mock_service):
-        from app.main import app
-        import importlib
-        import app.main as main_mod
-        importlib.reload(main_mod)
-        return AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        )
-
-
 @pytest.mark.asyncio
-async def test_create_project():
+async def test_create_project(client):
     mock_service = AsyncMock()
     mock_service.create.return_value = MOCK_PROJECT
 
-    with patch("app.database.connect_db", new_callable=AsyncMock), \
-         patch("app.database.close_db", new_callable=AsyncMock), \
-         patch("app.routers.projects.get_project_service", return_value=lambda: mock_service):
-        from app.main import app
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
-            resp = await ac.post("/api/v1/projects/", json={
-                "title": "Test Video",
-                "prompt": "Create a 60-second explainer video about machine learning",
-            })
+    app.dependency_overrides[get_project_service] = lambda: mock_service
+    try:
+        resp = await client.post("/api/v1/projects/", json={
+            "title": "Test Video",
+            "prompt": "Create a 60-second explainer video about machine learning",
+        })
         assert resp.status_code == 201
+        assert resp.json()["title"] == "Test Video"
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
-async def test_list_projects():
+async def test_list_projects(client):
     mock_service = AsyncMock()
     mock_service.list_all.return_value = [MOCK_PROJECT]
 
-    with patch("app.database.connect_db", new_callable=AsyncMock), \
-         patch("app.database.close_db", new_callable=AsyncMock), \
-         patch("app.routers.projects.get_project_service", return_value=lambda: mock_service):
-        from app.main import app
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as ac:
-            resp = await ac.get("/api/v1/projects/")
+    app.dependency_overrides[get_project_service] = lambda: mock_service
+    try:
+        resp = await client.get("/api/v1/projects/")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
-
+        assert len(resp.json()) == 1
+    finally:
+        app.dependency_overrides.clear()

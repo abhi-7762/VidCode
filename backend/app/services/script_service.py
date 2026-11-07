@@ -77,3 +77,4 @@ class ScriptService:
             {"$set": improved},
         )
         return await self.get_by_id(script_id)
+

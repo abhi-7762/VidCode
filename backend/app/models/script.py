@@ -87,3 +87,4 @@ class ScriptResponse(BaseModel):
     word_count: int
     nlu_analysis: NLUAnalysis
     created_at: str
+
