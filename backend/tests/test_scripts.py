@@ -90,3 +90,4 @@ async def test_get_script_by_project(client):
         assert resp.json()["project_id"] == "test_project_123"
     finally:
         app.dependency_overrides.clear()
+

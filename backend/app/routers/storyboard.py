@@ -90,3 +90,4 @@ async def regenerate_scene_prompt(
         return updated
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scene regeneration failed: {str(e)}")
+

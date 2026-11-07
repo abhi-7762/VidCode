@@ -105,3 +105,4 @@ async def test_update_scene(client):
         assert resp.json()["scenes"][0]["motion_strength"] == 8
     finally:
         app.dependency_overrides.clear()
+

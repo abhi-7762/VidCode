@@ -115,3 +115,4 @@ class StoryboardSceneUpdate(BaseModel):
 
 class PromptRegenerateRequest(BaseModel):
     additional_guidance: Optional[str] = None
+

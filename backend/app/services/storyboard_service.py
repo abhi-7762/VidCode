@@ -172,3 +172,4 @@ class StoryboardService:
             {"$set": {"scenes": scenes, "updated_at": now}},
         )
         return await self.get_by_id(storyboard_id)
+
