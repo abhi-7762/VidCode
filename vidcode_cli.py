@@ -10,6 +10,7 @@ Interactive terminal wizard that generates 1080x1920 Instagram/YouTube Reels:
 """
 
 import sys, os, asyncio, subprocess, textwrap
+from datetime import datetime
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
