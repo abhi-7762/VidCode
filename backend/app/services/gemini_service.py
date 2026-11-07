@@ -85,7 +85,10 @@ Analyse the user's video idea and return ONLY valid JSON with this exact structu
 }}
 No extra text. Only JSON."""
 
-        response = self.model.generate_content([system, f"User prompt: {prompt}"])
+        response = self.model.generate_content(
+            [system, f"User prompt: {prompt}"],
+            request_options={"timeout": 30},
+        )
         data = _extract_json(response.text)
         return NLUAnalysis(**data)
 
@@ -138,7 +141,10 @@ Make each scene vivid, specific, and cinematically interesting. No extra text. O
 Genre: {nlu.genre}
 Original idea: {request.prompt}"""
 
-        response = self.model.generate_content([system, prompt_text])
+        response = self.model.generate_content(
+            [system, prompt_text],
+            request_options={"timeout": 45},
+        )
 
         data = _extract_json(response.text)
 
@@ -165,7 +171,10 @@ Return the COMPLETE improved script in the same JSON format. Only JSON."""
 CURRENT SCRIPT:
 {json.dumps(script_data, indent=2)}"""
 
-        response = self.model.generate_content([system, prompt_text])
+        response = self.model.generate_content(
+            [system, prompt_text],
+            request_options={"timeout": 30},
+        )
         return _extract_json(response.text)
 
     # ------------------------------------------------------------------
@@ -177,10 +186,10 @@ CURRENT SCRIPT:
 Suggest 3 different narrative structures for the given topic.
 Return ONLY valid JSON: {"structures": [{"name": "...", "description": "...", "acts": ["act1", "act2", "act3"]}]}"""
 
-        response = self.model.generate_content([
-            system,
-            f"Topic: {topic}, Duration: {duration} seconds"
-        ])
+        response = self.model.generate_content(
+            [system, f"Topic: {topic}, Duration: {duration} seconds"],
+            request_options={"timeout": 30},
+        )
         data = _extract_json(response.text)
         return data.get("structures", [])
 

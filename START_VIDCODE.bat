@@ -8,3 +8,4 @@ echo.
 cd /d "%~dp0"
 backend\.venv\Scripts\python.exe vidcode_cli.py
 pause
+
