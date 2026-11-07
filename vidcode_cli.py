@@ -278,9 +278,31 @@ async def _generate_ai_assets(details: dict) -> tuple[dict, dict]:
         style=ScriptStyle.STORYTELLING,
         target_audience=details["audience"],
     )
-    nlu         = await gemini.analyse_prompt(prompt, details["duration_seconds"])
+    # Step 1: NLU (fast — small prompt)
+    nlu = await gemini.analyse_prompt(prompt, details["duration_seconds"])
+
+    # Step 2: Script (medium — structured JSON output)
     script_data = await gemini.generate_script(req, nlu)
-    sb_data     = await gemini.generate_storyboard(script_data)
+
+    # Step 3: Storyboard SKIPPED in CLI — too slow (30-60s+), not needed for video
+    # We generate basic storyboard data from script scenes directly
+    sb_data = {
+        "visual_theme": "cinematic, photorealistic, 4K",
+        "aspect_ratio": "16:9",
+        "characters": [],
+        "scenes": [
+            {
+                "scene_number": s.get("scene_number", i + 1),
+                "title": s.get("title", f"Scene {i+1}"),
+                "duration_seconds": s.get("duration_seconds", 5),
+                "action_description": s.get("action", ""),
+                "narration_cue": s.get("narration", ""),
+                "visual_prompt": f"{s.get('action', '')}, {details.get('tone', 'professional')}, cinematic 4K",
+                "environment": "professional setting",
+            }
+            for i, s in enumerate(script_data.get("scenes", []))
+        ],
+    }
     return script_data, sb_data
 
 def generate_ai_assets(details: dict) -> tuple[dict, dict]:
@@ -458,7 +480,7 @@ def run_pipeline():
     scenes_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Step 2: AI Script + Storyboard ────────────────────────────────
-    step_header(2, "AI Script & Storyboard — Gemini 3.8 Flash", "🧠")
+    step_header(2, "AI Script Generation — Gemini 3.8 Flash", "🧠")
 
     with Progress(
         SpinnerColumn(spinner_name="dots12", style="bright_cyan"),
@@ -466,7 +488,7 @@ def run_pipeline():
         TimeElapsedColumn(),
         console=console,
     ) as prog:
-        t = prog.add_task("Gemini AI se script aur storyboard banwaya ja raha hai...", total=None)
+        t = prog.add_task("Gemini AI se script ban raha hai (15-30 sec)...", total=None)
         # asyncio.run() safe here — no event loop is running yet
         script_data, storyboard_data = generate_ai_assets(details)
         prog.update(t, description="[bold green]✓  Script & Storyboard ready!")
