@@ -69,3 +69,4 @@ class CostService:
             total_estimated_cost_usd=total_cost,
             cost_saving_recommendations=recommendations,
         )
+

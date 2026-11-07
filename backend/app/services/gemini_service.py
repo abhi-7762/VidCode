@@ -29,7 +29,7 @@ def _init_gemini() -> genai.GenerativeModel:
     """Configure and return Gemini model instance."""
     genai.configure(api_key=settings.gemini_api_key)
     return genai.GenerativeModel(
-        model_name="gemini-1.5-pro",
+        model_name="gemini-3.8-flash",
         generation_config=genai.GenerationConfig(
             temperature=0.7,
             top_p=0.9,

@@ -140,3 +140,4 @@ async def test_activate_version(client):
         assert resp.json()["is_active"] is True
     finally:
         app.dependency_overrides.clear()
+

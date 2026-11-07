@@ -93,3 +93,4 @@ class ValidatorService:
         """Validates the latest rendered video file for a project."""
         target_file = self.storage.get_full_path(f"{project_id}/output/final_video.mp4")
         return self.validate_video_file(target_file)
+

@@ -71,3 +71,4 @@ No markdown outside JSON. No conversational text."""
                 optimization_recommendations=["Prompts are well-formed and ready for video generation."],
                 scene_evaluations=[{"scene_number": s.get("scene_number", 1), "score": 8.5, "critique": "Ready for render."} for s in scenes]
             )
+

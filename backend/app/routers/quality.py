@@ -116,3 +116,4 @@ async def splice_scene(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scene splicing failed: {str(e)}")
+

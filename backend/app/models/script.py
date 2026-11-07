@@ -60,7 +60,7 @@ class Script(BaseDocument):
     call_to_action: Optional[str] = None
     total_duration_seconds: int
     word_count: int
-    gemini_model: str = "gemini-1.5-pro"
+    gemini_model: str = "gemini-3.8-flash"
     generation_tokens: int = 0
 
 

@@ -42,7 +42,7 @@ class ScriptService:
             "project_id": request.project_id,
             "raw_prompt": request.prompt,
             "nlu_analysis": nlu.model_dump(),
-            "gemini_model": "gemini-1.5-pro",
+            "gemini_model": "gemini-3.8-flash",
             "generation_tokens": 0,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),

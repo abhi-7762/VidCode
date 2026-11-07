@@ -61,3 +61,4 @@ class SpliceSceneRequest(BaseModel):
     scene_number: int
     new_prompt: Optional[str] = None
     version_label: Optional[str] = "Spliced Scene Update"
+
